@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ikkilik Sanoq Sistemasi - Dars</title>
+
+<!--
+  =========================================================
+  SUPABASE UCHUN TAYYOR SQL (SQL Editor'ga nusxalab, RUN bosing)
+  =========================================================
+
+  -- 1) Jadval yaratish
+  create table if not exists binary_results (
+    id bigint generated always as identity primary key,
+    created_at timestamptz not null default now(),
+    amal text not null,          -- "qo'shish" / "ayirish" / "ko'paytirish"
+    son1 text not null,          -- birinchi ikkilik son
+    son2 text not null,          -- ikkinchi ikkilik son
+    natija text not null         -- hisoblangan natija (ikkilik va o'nlik)
+  );
+
+  -- 2) Row Level Security (RLS) ni yoqish
+  alter table binary_results enable row level security;
+
+  -- 3) anon roli uchun INSERT siyosati (yozish huquqi)
+  create policy "anon_insert_binary_results"
+  on binary_results
+  for insert
+  to anon
+  with check (true);
+
+  -- 4) anon roli uchun SELECT siyosati (o'qish huquqi)
+  create policy "anon_select_binary_results"
+  on binary_results
+  for select
+  to anon
+  using (true);
+
+  =========================================================
+-->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f0f4f8;
+    font-size: 20px;
+  }
+  header {
+    background: #2563eb;
+    color: white;
+    padding: 16px;
+    text-align: center;
+  }
+  header h1 {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+  }
+  #timer-box {
+    font-size: 28px;
+    font-weight: bold;
+    background: #1e40af;
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 10px;
+    margin-top: 8px;
+  }
+  .container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px;
+  }
+  .panel {
+    flex: 1;
+    min-width: 320px;
+    background: white;
+    border: 3px solid #2563eb;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel h2 {
+    color: #2563eb;
+    font-size: 26px;
+    margin-top: 0;
+    border-bottom: 2px solid #cbd5e1;
+    padding-bottom: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 18px;
+  }
+  table, th, td {
+    border: 2px solid #94a3b8;
+  }
+  th, td {
+    padding: 6px 10px;
+    text-align: center;
+  }
+  th {
+    background: #dbeafe;
+  }
+  .qoida-box {
+    background: #fef9c3;
+    border: 2px solid #eab308;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 19px;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    font-size: 20px;
+  }
+  select, input {
+    width: 100%;
+    font-size: 22px;
+    padding: 10px;
+    border: 2px solid #94a3b8;
+    border-radius: 8px;
+  }
+  button {
+    margin-top: 18px;
+    width: 100%;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 14px;
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+  }
+  #natija-box {
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 10px;
+    font-size: 22px;
+    font-weight: bold;
+    min-height: 30px;
+  }
+  .natija-ok {
+    background: #dcfce7;
+    border: 3px solid #16a34a;
+    color: #166534;
+  }
+  .natija-xato {
+    background: #fee2e2;
+    border: 3px solid #dc2626;
+    color: #991b1b;
+  }
+  #tarix-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+  }
+  #tarix-list li {
+    background: #f1f5f9;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+  details {
+    margin: 16px;
+    background: white;
+    border: 2px solid #2563eb;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 19px;
+  }
+  details summary {
+    font-size: 22px;
+    font-weight: bold;
+    color: #2563eb;
+    cursor: pointer;
+  }
+  details ol, details ul {
+    line-height: 1.6;
+  }
+  .izoh {
+    color: #64748b;
+    font-size: 16px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== SARLAVHA VA TAYMER ===================== -->
+<header>
+  <h1>IKKILIK SANOQ SISTEMASI</h1>
+  <div id="timer-box">VAQT: 10:00</div>
+</header>
+
+<!-- ===================== ASOSIY QISM: EKRAN IKKIGA BO'LINGAN ===================== -->
+<div class="container">
+
+  <!-- ===== CHAP PANEL: TUSHUNTIRISH ===== -->
+  <div class="panel">
+    <h2>1-QISM: TUSHUNTIRISH</h2>
+
+    <p><b>IKKILIK SANOQ SISTEMASI</b> nima? Bu faqat <b>0</b> va <b>1</b> raqamlaridan foydalanadigan sanoq sistemasi. Kompyuterlar aynan shu sistemada ishlaydi!</p>
+
+    <p><b>O'NLIK SISTEMA</b>da biz 10 ta raqamdan foydalanamiz: 0,1,2,...,9.<br>
+    <b>IKKILIK SISTEMA</b>da esa faqat 2 ta raqam bor: 0 va 1.</p>
+
+    <h2 style="font-size:22px;">2 NING DARAJALARI JADVALI</h2>
+    <table>
+      <tr><th>2^3</th><th>2^2</th><th>2^1</th><th>2^0</th></tr>
+      <tr><td>8</td><td>4</td><td>2</td><td>1</td></tr>
+    </table>
+    <p class="izoh">Masalan: 1011 (ikkilik) = 8+0+2+1 = 11 (o'nlik)</p>
+
+    <h2 style="font-size:22px;">QO'SHISH QOIDASI</h2>
+    <div class="qoida-box">
+      0+0=0 &nbsp;&nbsp; 0+1=1 &nbsp;&nbsp; 1+0=1 &nbsp;&nbsp; 1+1=<b>10</b> (0 yozamiz, 1 ni keyingi xonaga o'tkazamiz)
+    </div>
+
+    <h2 style="font-size:22px;">AYIRISH QOIDASI</h2>
+    <div class="qoida-box">
+      0-0=0 &nbsp;&nbsp; 1-0=1 &nbsp;&nbsp; 1-1=0 &nbsp;&nbsp; 0-1=<b>1</b> (qarz olamiz, 1 qarz qoldiramiz)
+    </div>
+
+    <h2 style="font-size:22px;">KO'PAYTIRISH QOIDASI</h2>
+    <div class="qoida-box">
+      0x0=0 &nbsp;&nbsp; 0x1=0 &nbsp;&nbsp; 1x0=0 &nbsp;&nbsp; 1x1=1 <br>
+      <span class="izoh">Ikkilikda ko'paytirish - oddiy qo'shish kabi, faqat har bir xonani alohida ko'paytirib, so'ng qo'shamiz.</span>
+    </div>
+  </div>
+
+  <!-- ===== O'NG PANEL: MASHQ VA NATIJA ===== -->
+  <div class="panel">
+    <h2>2-QISM: MASHQ VA NATIJA</h2>
+
+    <label for="amal">AMALNI TANLANG:</label>
+    <select id="amal">
+      <option value="qoshish">QO'SHISH (+)</option>
+      <option value="ayirish">AYIRISH (-)</option>
+      <option value="kopaytirish">KO'PAYTIRISH (x)</option>
+    </select>
+
+    <label for="son1">BIRINCHI IKKILIK SON (masalan: 101):</label>
+    <input type="text" id="son1" placeholder="Faqat 0 va 1 kiriting">
+
+    <label for="son2">IKKINCHI IKKILIK SON (masalan: 11):</label>
+    <input type="text" id="son2" placeholder="Faqat 0 va 1 kiriting">
+
+    <button id="hisobla-btn">HISOBLA VA SAQLA</button>
+
+    <div id="natija-box"></div>
+
+    <h2 style="font-size:22px; margin-top:24px;">OLDINGI NATIJALAR</h2>
+    <ul id="tarix-list">
+      <li>Yuklanmoqda...</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ===================== YO'RIQNOMA ===================== -->
+<details>
+  <summary>YO'RIQNOMA (O'QITUVCHI UCHUN)</summary>
+  <ol>
+    <li><b>Supabase'da loyiha ochish:</b> supabase.com saytiga kirib, "New Project" tugmasini bosing, loyiha nomini va parolni kiriting.</li>
+    <li><b>Jadval yaratish:</b> Chap menyudan "SQL Editor" bo'limini oching, shu faylning eng yuqorisidagi izoh ichidagi SQL kodni nusxalab, "RUN" tugmasini bosing.</li>
+    <li><b>URL va kalitni olish:</b> Chap menyudan "Project Settings" -> "API" bo'limiga kiring. U yerda "Project URL" va "anon public" (yoki "publishable") kalitni ko'rasiz.</li>
+    <li><b>"Row-level security policy" xatosi chiqsa:</b> Bu degani jadvalga yozish/o'qish siyosati (policy) to'g'ri o'rnatilmagan. SQL Editor'ga qaytib, yuqoridagi 2-4 qadamlardagi SQL kodlarni qayta ishga tushiring. Agar jadval allaqachon mavjud bo'lsa, avval "DROP POLICY IF EXISTS" bilan eski siyosatlarni o'chirib, qayta yarating.</li>
+  </ol>
+</details>
+
+<script>
+// =========================================================
+// 1-QADAM: SUPABASE ULANISH SOZLAMALARI
+// =========================================================
+const SUPABASE_URL = "https://anzslwadcilmmxmnehac.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SxcYtRkrb_AncSzlksWhuA_XXdey_qt";
+
+// Supabase mijozini (client) yaratamiz - bu orqali ma'lumotlar bazasiga ulanamiz
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// =========================================================
+// 2-QADAM: TAYMER (10 DAQIQA = 600 SONIYA)
+// =========================================================
+let qolganVaqt = 600; // 10 daqiqa = 600 soniya
+const timerBox = document.getElementById("timer-box");
+
+function taymerniYangila() {
+  if (qolganVaqt <= 0) {
+    timerBox.textContent = "VAQT TUGADI!";
+    clearInterval(taymerIntervali);
+    return;
+  }
+  const daqiqa = Math.floor(qolganVaqt / 60);
+  const soniya = qolganVaqt % 60;
+  const soniyaMatn = soniya < 10 ? "0" + soniya : soniya;
+  timerBox.textContent = "VAQT: " + daqiqa + ":" + soniyaMatn;
+  qolganVaqt--;
+}
+
+taymerniYangila(); // sahifa ochilgan zahoti bir marta ko'rsatamiz
+const taymerIntervali = setInterval(taymerniYangila, 1000); // har soniyada yangilaymiz
+
+// =========================================================
+// 3-QADAM: IKKILIK SONLARNI TEKSHIRISH VA HISOBLASH FUNKSIYALARI
+// =========================================================
+
+// Satr faqat 0 va 1 dan iboratligini tekshiramiz
+function ikkilikToMi(satr) {
+  return /^[01]+$/.test(satr);
+}
+
+// Ikkilik sonni o'nlik songa aylantiramiz (parseInt yordamida, 2-asos bilan)
+function ikkilikdanOnlikka(satr) {
+  return parseInt(satr, 2);
+}
+
+// O'nlik sonni ikkilik songa aylantiramiz
+function onlikdanIkkilikka(son) {
+  if (son < 0) {
+    return "-" + Math.abs(son).toString(2);
+  }
+  return son.toString(2);
+}
+
+// Asosiy hisoblash funksiyasi - amalga qarab natija qaytaradi
+function hisoblaAmal(amal, son1, son2) {
+  const o1 = ikkilikdanOnlikka(son1);
+  const o2 = ikkilikdanOnlikka(son2);
+  let onlikNatija;
+
+  if (amal === "qoshish") {
+    onlikNatija = o1 + o2;
+  } else if (amal === "ayirish") {
+    onlikNatija = o1 - o2;
+  } else if (amal === "kopaytirish") {
+    onlikNatija = o1 * o2;
+  }
+
+  const ikkilikNatija = onlikdanIkkilikka(onlikNatija);
+  return { ikkilikNatija, onlikNatija };
+}
+
+// =========================================================
+// 4-QADAM: TARIXNI SUPABASE'DAN O'QISH VA EKRANDA KO'RSATISH
+// =========================================================
+const tarixList = document.getElementById("tarix-list");
+
+async function tarixniYukla() {
+  tarixList.innerHTML = "<li>Yuklanmoqda...</li>";
+  try {
+    // 15 soniyalik vaqt chegarasi - internet sekin bo'lsa ham dastur qotib qolmasligi uchun
+    const soroviPromise = supabase
+      .from("binary_results")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const vaqtChegarasi = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Javob kutish vaqti tugadi (internet sekin)")), 15000)
+    );
+
+    const { data, error } = await Promise.race([soroviPromise, vaqtChegarasi]);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      tarixList.innerHTML = "<li>Hozircha yozuv yo'q</li>";
+      return;
+    }
+
+    tarixList.innerHTML = "";
+    data.forEach((qator) => {
+      const li = document.createElement("li");
+      const amalBelgi = qator.amal === "qoshish" ? "+" : (qator.amal === "ayirish" ? "-" : "x");
+      li.textContent = qator.son1 + " " + amalBelgi + " " + qator.son2 + " = " + qator.natija;
+      tarixList.appendChild(li);
+    });
+  } catch (err) {
+    tarixList.innerHTML = "<li style='color:#dc2626;'>XATOLIK: " + err.message + "</li>";
+  }
+}
+
+// =========================================================
+// 5-QADAM: YANGI NATIJANI SUPABASE'GA SAQLASH
+// =========================================================
+const hisoblaBtn = document.getElementById("hisobla-btn");
+const natijaBox = document.getElementById("natija-box");
+
+hisoblaBtn.addEventListener("click", async () => {
+  const amal = document.getElementById("amal").value;
+  const son1 = document.getElementById("son1").value.trim();
+  const son2 = document.getElementById("son2").value.trim();
+
+  // Bo'sh maydonlarni tekshiramiz
+  if (son1 === "" || son2 === "") {
+    natijaBox.className = "natija-xato";
+    natijaBox.textContent = "XATOLIK: Ikkala sonni ham kiriting!";
+    return;
+  }
+
+  // Faqat 0 va 1 raqamlaridan iborat ekanligini tekshiramiz
+  if (!ikkilikToMi(son1) || !ikkilikToMi(son2)) {
+    natijaBox.className = "natija-xato";
+    natijaBox.textContent = "XATOLIK: Faqat 0 va 1 raqamlarini kiriting!";
+    return;
+  }
+
+  // Tugmani vaqtincha o'chiramiz va matnini o'zgartiramiz
+  hisoblaBtn.disabled = true;
+  hisoblaBtn.textContent = "YUBORILMOQDA...";
+
+  try {
+    const { ikkilikNatija, onlikNatija } = hisoblaAmal(amal, son1, son2);
+    const natijaMatn = ikkilikNatija + " (ya'ni o'nlikda: " + onlikNatija + ")";
+
+    // 15 soniyalik vaqt chegarasi bilan Supabase'ga yozamiz
+    const soroviPromise = supabase
+      .from("binary_results")
+      .insert([{ amal: amal, son1: son1, son2: son2, natija: natijaMatn }]);
+
+    const vaqtChegarasi = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Saqlash vaqti tugadi (internet sekin)")), 15000)
+    );
+
+    const { error } = await Promise.race([soroviPromise, vaqtChegarasi]);
+
+    if (error) throw error;
+
+    natijaBox.className = "natija-ok";
+    natijaBox.textContent = "NATIJA: " + natijaMatn + " (saqlandi)";
+
+    // Ro'yxatni yangilaymiz
+    await tarixniYukla();
+
+  } catch (err) {
+    natijaBox.className = "natija-xato";
+    natijaBox.textContent = "XATOLIK: " + err.message;
+  } finally {
+    // Tugmani qayta yoqamiz
+    hisoblaBtn.disabled = false;
+    hisoblaBtn.textContent = "HISOBLA VA SAQLA";
+  }
+});
+
+// =========================================================
+// 6-QADAM: SAHIFA OCHILGANDA TARIXNI YUKLASH
+// =========================================================
+tarixniYukla();
+</script>
+
+</body>
+</html>
